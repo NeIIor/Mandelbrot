@@ -18,7 +18,7 @@ This study evaluates optimization techniques for Mandelbrot set computation thro
 
 ## Objectives  
 1. Measure execution time for each implementation  
-2. Calculate speedup factors and errors  
+2. Calculate speed-up factors and errors  
 3. Compare manual vs compiler optimizations  
 4. Establish performance scaling laws  
 
@@ -30,7 +30,7 @@ Test Platform:
   - Cache: 24MB L3  
   - SIMD: AVX2, FMA3  
 - RAM: 8GB DDR4-3200  
-- OS: Windows 10 x64  
+- OS: Linux 6.1.0-30-amd64 
 - Compiler: GCC 11.2 (-O2/-O3)  
 
 ---
@@ -242,15 +242,17 @@ void compute_mandelbrot_avx2(double center_x, double center_y, double scale) {
 ## Results  
 
 ### Absolute Performance (seconds; basic 1x; -O D = -O default)  100 runs
-| Implementation | -O D | -O3  | Speedup -O D | Speedup -O3 | Error (%) |  
+| Implementation | -O D | -O3  |  -O D | Speed-up -O3 | Error (%) |  
 |----------------|------|------|--------------|-------------|-----------|  
 | basic          | 17.15| 9.49 | 1.00x        |   1.82x     |  ±0.3%    |  
 | array          | 15.87| 4.00 | 1.08x        |   4.29x     |  ±2.2%    |  
 | avx            | 27.50| 5.17 | 0.62x        |   3.32x     |  ±2.1%    |  
 | avx2+fma       | 14.26| 2.83 | 1.20x        |   6.06x     |  ±1.8%    |  
 
-### Relative Speedup (vs simple -O2)  
-![chart](https://github.com/user-attachments/assets/e834c6a4-391d-4bdb-8b0c-60f2f5f5e89a)
+### Relative Speed-up (vs simple -O2)  
+![chart](https://github.com/user-attachments/assets/547668fc-cb2c-41db-a799-402c265d63c0)
+
+
 
 ### Scaling Behavior  
 Table 1: Time per 10⁹ Cycles (ms)  
@@ -268,15 +270,15 @@ Full tables and graphs you can find on [link](https://docs.google.com/spreadshee
 ## Analysis  
 
 1. Compiler Impact  
-   - -O3 provides 1.81-5.0x speedup over default -O
+   - -O3 provides 1.81-5.0x speed-up over default -O
    - Auto-vectorization effective for scalar code  
 
 2. Optimization Effectiveness  
-   - AVX2 achieves 15.33x total speedup  
+   - AVX2 achieves 15.33x total speed-up  
    - Manual unrolling helps compiler optimization  
 
 3. Theoretical Limits  
-   - AVX2 reaches 76% of theoretical 8x speedup  
+   - AVX2 reaches 76% of theoretical 8x speed-up  
    - Memory bandwidth becomes limiting factor  
 
 ---
@@ -285,7 +287,7 @@ Full tables and graphs you can find on [link](https://docs.google.com/spreadshee
 
 1. Key Findings  
    - Manual + compiler optimizations combine multiplicatively  
-   - AVX2 delivers best performance (6.06x speedup)  
+   - AVX2 delivers best performance (6.06x speed-up)  
 
 2. Recommendations  
    - Always use -O3 -march=native  
