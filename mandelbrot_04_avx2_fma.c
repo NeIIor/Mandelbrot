@@ -39,7 +39,7 @@ sfColor get_color(int iterations) {
 double compute_mandelbrot_avx2(sfUint8* pixels, const MandelbrotState* state) {
     clock_t start = clock();
     
-    int* iterations = malloc(WIDTH * HEIGHT * sizeof(int));
+    int* iterations = (int*) malloc(WIDTH * HEIGHT * sizeof(int));
     if (!iterations) return 0.0;
 
     const __m256d escape_radius = _mm256_set1_pd(ESCAPE_RADIUS * ESCAPE_RADIUS);
@@ -68,13 +68,12 @@ double compute_mandelbrot_avx2(sfUint8* pixels, const MandelbrotState* state) {
                 for (int i = 0; i < MAX_ITER && mask; i++) {
                     __m256d zx2 = _mm256_mul_pd(zx, zx);
                     __m256d zy2 = _mm256_mul_pd(zy, zy);
-                    __m256d xy = _mm256_mul_pd(zx, zy);
+                    __m256d xy  = _mm256_mul_pd(zx, zy);
                     
                     __m256d new_zx = _mm256_sub_pd(zx2, zy2);
                     new_zx = _mm256_add_pd(new_zx, cx);
                     
-                    __m256d new_zy = _mm256_mul_pd(xy, two);
-                    new_zy = _mm256_add_pd(new_zy, cy);
+                    __m256d new_zy = _mm256_fmadd_pd(xy, two, cy);
                     
                     zx = new_zx;
                     zy = new_zy;
@@ -82,7 +81,6 @@ double compute_mandelbrot_avx2(sfUint8* pixels, const MandelbrotState* state) {
                     __m256d norm = _mm256_add_pd(_mm256_mul_pd(zx, zx), _mm256_mul_pd(zy, zy));
                     mask = _mm256_movemask_pd(_mm256_cmp_pd(norm, escape_radius, _CMP_LT_OS));
                     
-                    // Правильное преобразование маски
                     __m256d mask_vec = _mm256_castsi256_pd(
                         _mm256_setr_epi64x(
                             (mask & 0x1) ? ~0ULL : 0,
@@ -102,7 +100,7 @@ double compute_mandelbrot_avx2(sfUint8* pixels, const MandelbrotState* state) {
                 }
             }
         }
-    }
+    }                    
 
     clock_t end = clock();
     double compute_time = (double)(end - start) / CLOCKS_PER_SEC;
@@ -179,7 +177,7 @@ int main(int argc, char* argv[]) {
         sfSprite_setTexture(sprite, texture, sfTrue);
 
         // Pixel buffer (RGBA format)
-        pixels = malloc(WIDTH * HEIGHT * 4);
+        pixels = (sfUint8*) malloc(WIDTH * HEIGHT * 4);
         if (!pixels) return 1;
         memset(pixels, 0, WIDTH * HEIGHT * 4);
 

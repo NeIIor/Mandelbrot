@@ -1,9 +1,9 @@
 #include <SFML/Graphics.h>
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
-#include <immintrin.h>
-#include <time.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_ITER 256
 #define ESCAPE_RADIUS 10.0
@@ -18,7 +18,6 @@ typedef struct {
     int color_formula;
 } MandelbrotState;
 
-// Глобальные флаги
 int graphics_enabled = 1;
 int run_count = 1;
 
@@ -35,69 +34,57 @@ sfColor get_color(int iterations) {
     }
 }
 
-double compute_mandelbrot_sse(sfUint8* pixels, const MandelbrotState* state) {
-    clock_t start = clock();
+double compute_mandelbrot_optimized(sfUint8* pixels, const MandelbrotState* state) {
+    clock_t start = clock(); 
     
-    int* iterations = malloc(WIDTH * HEIGHT * sizeof(int));
+    int* iterations = (int*) malloc(WIDTH * HEIGHT * sizeof(int));
     if (!iterations) return 0.0;
-
-    __m128d escape_radius = _mm_set1_pd(ESCAPE_RADIUS * ESCAPE_RADIUS);
-    __m128d scale = _mm_set1_pd(state->scale);
-    __m128d center_x = _mm_set1_pd(state->center_x);
-    __m128d center_y = _mm_set1_pd(state->center_y);
-    __m128d width_half = _mm_set1_pd(WIDTH / 2.0);
-    __m128d two = _mm_set1_pd(2.0);
 
     for (int r = 0; r < run_count; r++) {
         for (int y = 0; y < HEIGHT; y++) {
-            __m128d y_coord = _mm_set1_pd(y - HEIGHT / 2.0);
-            __m128d cy = _mm_add_pd(center_y, _mm_mul_pd(y_coord, scale));
-            
-            for (int x = 0; x < WIDTH; x += 2) {
-                __m128d x_coord = _mm_set_pd(x + 1, x);
-                __m128d cx = _mm_add_pd(center_x, 
-                              _mm_mul_pd(_mm_sub_pd(x_coord, width_half), scale));
-
-                __m128d zx = cx;
-                __m128d zy = cy;
-                __m128i iter = _mm_setzero_si128();
-                __m128i one = _mm_set1_epi64x(1);
-                int mask = 3;
-
-                for (int i = 0; i < MAX_ITER && mask; i++) {
-                    __m128d zx2 = _mm_mul_pd(zx, zx);
-                    __m128d zy2 = _mm_mul_pd(zy, zy);
-                    __m128d zxzy = _mm_mul_pd(_mm_mul_pd(zx, zy), two);
-
-                    zx = _mm_add_pd(_mm_sub_pd(zx2, zy2), cx);
-                    zy = _mm_add_pd(zxzy, cy);
-
-                    __m128d norm = _mm_add_pd(zx2, zy2);
-                    __m128d cmp = _mm_cmplt_pd(norm, escape_radius);
-                    mask = _mm_movemask_pd(cmp);
-
-                    __m128i inc = _mm_castpd_si128(cmp);
-                    iter = _mm_add_epi64(iter, _mm_and_si128(inc, one));
+            for (int x = 0; x < WIDTH; x += 4) {
+                double cx[4], cy[4];
+                for (int k = 0; k < 4; k++) {
+                    cx[k] = state->center_x + (x + k - WIDTH/2.0) * state->scale;
+                    cy[k] = state->center_y + (y - HEIGHT/2.0) * state->scale;
                 }
 
-                int iter_result[2];
-                _mm_storeu_si128((__m128i*)iter_result, iter);
-                
-                iterations[y * WIDTH + x] = iter_result[0];
-                if (x + 1 < WIDTH) {
-                    iterations[y * WIDTH + x + 1] = iter_result[1];
+                double zx[4] = {0}, zy[4] = {0};
+                int iter[4] = {0};
+                int mask = 0;
+
+                for (int i = 0; i < MAX_ITER && mask != 0x0F; i++) {
+                    for (int k = 0; k < 4; k++) {
+                        if (mask & (1 << k)) continue;
+
+                        double zx2 = zx[k] * zx[k];
+                        double zy2 = zy[k] * zy[k];
+                        double zxzy = 2 * zx[k] * zy[k];
+
+                        zx[k] = zx2 - zy2 + cx[k];
+                        zy[k] = zxzy + cy[k];
+
+                        if (zx2 + zy2 > ESCAPE_RADIUS * ESCAPE_RADIUS) {
+                            mask |= (1 << k);
+                            iter[k] = i;
+                        }
+                    }
+                }
+
+                for (int k = 0; k < 4 && (x + k) < WIDTH; k++) {
+                    iterations[y*WIDTH + x + k] = iter[k];
                 }
             }
         }
     }
 
-    clock_t end = clock();
+    clock_t end = clock(); 
     double compute_time = (double)(end - start) / CLOCKS_PER_SEC;
 
     if (graphics_enabled && pixels) {
-        for (int i = 0; i < WIDTH * HEIGHT; i++) {
+        for (int i = 0; i < WIDTH*HEIGHT; i++) {
             sfColor color = get_color(iterations[i]);
-            pixels[4*i] = color.r;
+            pixels[4*i]   = color.r;
             pixels[4*i+1] = color.g;
             pixels[4*i+2] = color.b;
             pixels[4*i+3] = 255;
@@ -147,7 +134,7 @@ int main(int argc, char* argv[]) {
     if (graphics_enabled) {
         window = sfRenderWindow_create(
             (sfVideoMode){WIDTH, HEIGHT, 32},
-            "Mandelbrot Set (SSE Optimized)",
+            "Mandelbrot Set (Optimized)",
             sfClose, NULL
         );
         if (!window) return 1;
@@ -156,7 +143,7 @@ int main(int argc, char* argv[]) {
         sprite = sfSprite_create();
         sfSprite_setTexture(sprite, texture, sfTrue);
 
-        pixels = malloc(WIDTH * HEIGHT * 4);
+        pixels = (sfUint8*) malloc(WIDTH * HEIGHT * 4);
         font = sfFont_createFromFile("Roboto-Italic-VariableFont_wdth,wght.ttf");
         fpsText = sfText_create();
         sfText_setFont(fpsText, font);
@@ -190,7 +177,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        double compute_time = compute_mandelbrot_sse(pixels, &state);
+        double compute_time = compute_mandelbrot_optimized(pixels, &state);
         frameCount++;
 
         if (graphics_enabled) {

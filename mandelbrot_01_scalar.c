@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>  // Добавлен для clock()
+#include <time.h>
 
 #define MAX_ITER 256
 #define ESCAPE_RADIUS 10.0
@@ -18,7 +18,6 @@ typedef struct {
     int color_formula;
 } MandelbrotState;
 
-// Глобальные флаги
 int graphics_enabled = 1;
 int run_count = 1;
 
@@ -36,14 +35,15 @@ sfColor get_color(int iterations) {
 }
 
 double compute_mandelbrot(sfUint8* pixels, const MandelbrotState* state) {
-    clock_t start = clock();  // Начало измерения времени
+    clock_t start = clock(); 
+    int* iterations = (int*) malloc(WIDTH * HEIGHT * sizeof(int)); 
     
     for (int y = 0; y < HEIGHT; y++) {
         for (int x = 0; x < WIDTH; x++) {
             double zx, zy;
             double cx = state->center_x + (x - WIDTH / 2.0) * state->scale;
             double cy = state->center_y + (y - HEIGHT / 2.0) * state->scale;
-
+            
             int iter = 0;
             
             for (int r = 0; r < run_count; r++) {
@@ -59,14 +59,15 @@ double compute_mandelbrot(sfUint8* pixels, const MandelbrotState* state) {
                     zx = zx2 - zy2 + cx;
                     iter++;
                 }
+
+                iterations[y * WIDTH + x] = iter;
             }
         }
     }
 
-    clock_t end = clock(); // Конец замера ВЫЧИСЛЕНИЙ
+    clock_t end = clock();
     double compute_time = (double)(end - start) / CLOCKS_PER_SEC;
 
-    // Отрисовка (НЕ входит в замер времени)
     if (graphics_enabled && pixels) {
         for (int i = 0; i < WIDTH*HEIGHT; i++) {
             sfColor color = get_color(iterations[i]);
@@ -76,8 +77,7 @@ double compute_mandelbrot(sfUint8* pixels, const MandelbrotState* state) {
             pixels[4*i+3] = 255;
         }
     }
-
-    free(iterations);
+    free (iterations);
     return compute_time;
 }
 
@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
         sprite = sfSprite_create();
         sfSprite_setTexture(sprite, texture, sfTrue);
 
-        pixels = malloc(WIDTH * HEIGHT * 4);
+        pixels = (sfUint8*) malloc(WIDTH * HEIGHT * 4);
 
         font = sfFont_createFromFile("Roboto-Italic-VariableFont_wdth,wght.ttf");
         fpsText = sfText_create();
@@ -174,7 +174,6 @@ int main(int argc, char* argv[]) {
 
         frameCount++;
         
-        // Вычисляем множество Мандельброта и замеряем время
         compute_time = compute_mandelbrot(pixels, &state);
 
         if (graphics_enabled) {
@@ -200,7 +199,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Очистка ресурсов
     if (graphics_enabled) {
         free(pixels);
         sfText_destroy(fpsText);
